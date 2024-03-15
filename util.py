@@ -1,3 +1,5 @@
+from typing import List
+
 import skimage.util as skutil
 import skimage.io as skio
 import tensorflow as tf
@@ -5,6 +7,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 
 
 def read_img(path: str) -> npt.NDArray[np.float64]:
