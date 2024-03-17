@@ -1,3 +1,4 @@
+import argparse
 from enum import Enum
 from typing import Tuple, List
 
@@ -7,8 +8,8 @@ from matplotlib import pyplot as plt
 import numpy.typing as npt
 from matplotlib.axes import Axes
 from sklearn.metrics import precision_score, recall_score, ConfusionMatrixDisplay
-
-import util
+import skimage.util as skutil
+import skimage.io as skio
 import tensorflow as tf
 from pathlib import Path
 
@@ -117,37 +118,52 @@ def test_model(model: tf.keras.Model, x_test_data: tf.Tensor, y_test_data: npt.N
     return test_accuracy, p_score, r_score
 
 
+def read_img(path: str) -> npt.NDArray[np.float64]:
+    return tf.convert_to_tensor(skutil.img_as_float64(skio.imread(path)), dtype=tf.float64)
+
+
+def pd_series_to_tensor(series: pd.Series) -> tf.Tensor:
+    vanilla_list = series.to_list()
+    return tf.convert_to_tensor(vanilla_list, dtype=tf.float64)
+
+
+def process_data_to_x_y_tensor(data_path: str, filename: str):
+    df = pd.read_csv(f"{data_path}/{filename}")
+    df["Filename"] = f"{data_path}/" + df["Filename"].astype(str)
+    df["Image"] = df["Filename"].apply(read_img)
+    return pd_series_to_tensor(df["Image"]), df["Label"].values
+
+
+def parsearg():
+    parser = argparse.ArgumentParser(description="Train model and graph performance of model from training and "
+                                                 "validation")
+    parser.add_argument("--data_path", help="Path to the data", default="./data/EuroSatData", type=str)
+    parser.add_argument("--batch_size", help="Batch size used in training and validation", default=16, type=int)
+    parser.add_argument("--epochs", help="Number of epochs to train on", default=6, type=int)
+    parser.add_argument("--lr", help="Learning rate", default=0.001, type=float)
+    parser.add_argument("--result_directory", help="Output location of graphs", default="./pipeline_result", type=str)
+    parser.add_argument("--saved_model_location", help="Path to save model to. Must include the name of the file and "
+                                                       "extension", default="./data/trained_model.h5", type=str)
+
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
-
+    args = parsearg()
     INPUT_SHAPE = (64, 64, 3)
     UNITS = 10
-    EPOCHS = 6
-    BATCH_SIZE = 16
-    LR = 0.001
-    MODEL_NAME = "SatClass"
-    RESULTS_DIRECTORY = "./pipeline_result"
+    EPOCHS = args.epochs
+    BATCH_SIZE = args.batch_size
+    LR = args.lr
+    RESULTS_DIRECTORY = args.result_directory
 
-    TRAIN_DATA = "./data/EuroSatData/train.csv"
-    TEST_DATA = "./data/EuroSatData/test.csv"
-    VALIDATION_DATA = "./data/EuroSatData/validation.csv"
-    BLANK_MODEL = "./data/blank_vgg16.h5"
-    MAIN_MODEL = "./data/trained_vgg16.h5"
+    DATA_PATH = args.data_path
+    MAIN_MODEL = args.saved_model_location
 
-    train_df = pd.read_csv(TRAIN_DATA)
-    train_df["Filename"] = "./data/EuroSatData/" + train_df["Filename"].astype(str)
-    test_df = pd.read_csv(TEST_DATA)
-    test_df["Filename"] = "./data/EuroSatData/" + test_df["Filename"].astype(str)
-    validation_df = pd.read_csv(VALIDATION_DATA)
-    validation_df["Filename"] = "./data/EuroSatData/" + validation_df["Filename"].astype(str)
-
-    train_df["Image"] = train_df["Filename"].apply(util.read_img)
-    test_df["Image"] = test_df["Filename"].apply(util.read_img)
-    validation_df["Image"] = validation_df["Filename"].apply(util.read_img)
-
-    x_train, y_train = util.pd_series_to_tensor(train_df["Image"]), train_df["Label"].values
-    x_test, y_test = util.pd_series_to_tensor(test_df["Image"]), test_df["Label"].values
-    x_validation, y_validation = util.pd_series_to_tensor(validation_df["Image"]), validation_df["Label"].values
+    x_train, y_train = process_data_to_x_y_tensor(DATA_PATH, "train.csv")
+    x_test, y_test = process_data_to_x_y_tensor(DATA_PATH, "test.csv")
+    x_validation, y_validation = process_data_to_x_y_tensor(DATA_PATH, "validation.csv")
 
     my_model = SatClassModel(UNITS, INPUT_SHAPE)
     my_model.build((None,) + INPUT_SHAPE)
@@ -162,7 +178,7 @@ if __name__ == '__main__':
                                  validation_data=(x_validation, y_validation),
                                  batch_size=BATCH_SIZE,
                                  epochs=EPOCHS, verbose=2)
-    my_model.save(MODEL_NAME)
+    my_model.save_weights(MAIN_MODEL)
 
     train_losses = train_history.history["loss"]
     train_accuracy = train_history.history["accuracy"]
@@ -171,10 +187,10 @@ if __name__ == '__main__':
 
     fig, ax = plt.subplots(1, 2, figsize=(16, 6))
 
-    plot_train_vs_validation_metric(ax[0][0], train_losses, validation_losses, "Loss", EPOCHS)
-    plot_train_vs_validation_metric(ax[0][1], train_accuracy, train_accuracy, "Accuracy", EPOCHS)
+    plot_train_vs_validation_metric(ax[0], train_losses, validation_losses, "Loss", EPOCHS)
+    plot_train_vs_validation_metric(ax[1], train_accuracy, validation_accuracy, "Accuracy", EPOCHS)
 
     Path(RESULTS_DIRECTORY).mkdir(parents=False, exist_ok=True)
-    fig.saveFig(f"{RESULTS_DIRECTORY}/loss_accuracy_graph.png")
+    fig.savefig(f"{RESULTS_DIRECTORY}/loss_accuracy_graph.png")
 
     accuracy, p_score, r_score = test_model(my_model, x_test, y_test)
