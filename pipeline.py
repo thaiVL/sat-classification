@@ -1,17 +1,17 @@
 import argparse
 from enum import Enum
+from pathlib import Path
 from typing import Tuple, List
 
 import numpy as np
-import pandas as pd
-from matplotlib import pyplot as plt
 import numpy.typing as npt
-from matplotlib.axes import Axes
-from sklearn.metrics import precision_score, recall_score, ConfusionMatrixDisplay
-import skimage.util as skutil
+import pandas as pd
 import skimage.io as skio
+import skimage.util as skutil
 import tensorflow as tf
-from pathlib import Path
+from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+from sklearn.metrics import precision_score, recall_score
 
 
 class Label(Enum):

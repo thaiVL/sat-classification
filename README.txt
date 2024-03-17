@@ -4,10 +4,11 @@ The goal of this project is to build a pipeline to train a model and update weig
 new samples/images given by the user.
 
 NOTE: To simplify this project and fit the outlined requirements of the email sent to me, I've removed files 
-that involved searching for the ideal hyperparameters for the model and combined many python files into one in order
+related to other functions (such as finding hyperparameters) and combined many python files into one in order
 to reduce the number of files present. Many of the functions and classes in pipeline.py were originally belonging
 to other python files.
 
+The pipeline.py and predict.py are the core files of my project.
 
 # Script documentation
 
